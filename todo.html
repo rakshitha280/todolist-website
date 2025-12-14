@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Toodle Weekly Planner 📅</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div class="login-container" id="loginPage">
+  <div class="login-card">
+    <h1 class="login-title">Toodle 🐣</h1>
+
+    <div class="input-row">
+      <label>Name</label>
+      <input type="text" id="username" placeholder="Enter your name">
+    </div>
+
+    <div class="button-row">
+      <button onclick="login()">Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="todo-card hidden" id="planner">
+  <h1 id="welcome"></h1>
+<!-- HEADER IMAGES -->
+<div class="header-images">
+  <img src="https://i.pinimg.com/originals/f0/fe/97/f0fe9795a9953569f02c39b28ceb7700.jpg" alt="Planner">
+  <img src="https://m.media-amazon.com/images/I/51EBzy6UKXL._AC_UF1000,1000_QL80_.jpg" alt="Goals">
+  <img src="https://thumbs.dreamstime.com/b/numbers-empty-paper-card-to-do-list-blue-background-top-view-planning-design-concept-418042811.jpg" alt="Focus">
+</div>
+
+  <!-- STATS -->
+  <div class="stats-container">
+    <div class="stat-box"><h3>Total</h3><span id="totalTasks">0</span></div>
+    <div class="stat-box"><h3>Completed</h3><span id="completedTasks">0</span></div>
+    <div class="stat-box"><h3>Pending</h3><span id="pendingTasks">0</span></div>
+    <canvas id="taskChart" width="180" height="180"></canvas>
+  </div>
+
+  <div class="controls">
+    <button id="clearAll">Clear All Tasks</button>
+  </div>
+
+  <!-- PER DAY CHARTS -->
+  <div class="day-charts" id="dayCharts"></div>
+
+  <!-- SCHEDULE -->
+  <div class="schedule-container">
+    <div class="time-row">
+      <div class="day-cell empty"></div>
+      <script>
+        for (let i = 0; i < 24; i++) {
+          const row = document.currentScript.parentElement;
+          const cell = document.createElement("div");
+          cell.className = "hour-cell";
+          cell.textContent = `${i % 12 === 0 ? 12 : i % 12} ${i < 12 ? 'AM' : 'PM'}`;
+          row.appendChild(cell);
+        }
+      </script>
+    </div>
+    <div id="schedule-body"></div>
+  </div>
+</div>
+
+<script>
+/* ---------- LOGIN ---------- */
+const loginPage = document.getElementById("loginPage");
+const planner = document.getElementById("planner");
+
+if (localStorage.getItem("user")) showPlanner();
+
+function login() {
+  const name = document.getElementById("username").value.trim();
+  if (!name) return alert("Enter name");
+  localStorage.setItem("user", name);
+  showPlanner();
+}
+
+function showPlanner() {
+  loginPage.style.display = "none";
+  planner.classList.remove("hidden");
+  document.getElementById("welcome").textContent =
+    "Welcome, " + localStorage.getItem("user") + " 😍";
+}
+
+/* ---------- PLANNER ---------- */
+const days = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+const scheduleBody = document.getElementById("schedule-body");
+const dayCharts = document.getElementById("dayCharts");
+
+const totalEl = document.getElementById("totalTasks");
+const completedEl = document.getElementById("completedTasks");
+const pendingEl = document.getElementById("pendingTasks");
+
+const pieCtx = document.getElementById("taskChart").getContext("2d");
+
+const dayCanvas = [];
+
+days.forEach((day, d) => {
+  // Day chart
+  const box = document.createElement("div");
+  box.className = "day-chart-box";
+  box.innerHTML = `<h4>${day}</h4><canvas width="120" height="80"></canvas>`;
+  dayCharts.appendChild(box);
+  dayCanvas[d] = box.querySelector("canvas").getContext("2d");
+
+  // Planner row
+  const row = document.createElement("div");
+  row.className = "day-row";
+
+  const dayCell = document.createElement("div");
+  dayCell.className = "day-cell";
+  dayCell.textContent = day;
+  row.appendChild(dayCell);
+
+  for (let h = 0; h < 24; h++) {
+    const slot = document.createElement("div");
+    slot.className = "hour-slot";
+
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "hour-done";
+
+    const text = document.createElement("input");
+    text.className = "task-name";
+    text.placeholder = "Task";
+
+    const ck = `c-${d}-${h}`;
+    const tk = `t-${d}-${h}`;
+
+    cb.checked = localStorage.getItem(ck) === "true";
+    text.value = localStorage.getItem(tk) || "";
+
+    cb.onchange = () => { localStorage.setItem(ck, cb.checked); update(); };
+    text.oninput = () => localStorage.setItem(tk, text.value);
+
+    slot.append(cb, text);
+    row.appendChild(slot);
+  }
+  scheduleBody.appendChild(row);
+});
+
+function update() {
+  const boxes = document.querySelectorAll(".hour-done");
+  const done = [...boxes].filter(b => b.checked).length;
+  totalEl.textContent = boxes.length;
+  completedEl.textContent = done;
+  pendingEl.textContent = boxes.length - done;
+  drawPie(done, boxes.length - done);
+  drawDayCharts();
+}
+
+function drawPie(done, pending) {
+  pieCtx.clearRect(0,0,180,180);
+  const total = done + pending;
+  if (!total) return;
+  let a = (done / total) * Math.PI * 2;
+  pieCtx.fillStyle="#22c55e";
+  pieCtx.beginPath(); pieCtx.moveTo(90,90); pieCtx.arc(90,90,80,0,a); pieCtx.fill();
+  pieCtx.fillStyle="#f43f5e";
+  pieCtx.beginPath(); pieCtx.moveTo(90,90); pieCtx.arc(90,90,80,a,Math.PI*2); pieCtx.fill();
+}
+
+function drawDayCharts() {
+  days.forEach((_, d) => {
+    const ctx = dayCanvas[d];
+    ctx.clearRect(0,0,120,80);
+    let done = 0;
+    for (let h=0; h<24; h++) {
+      if (localStorage.getItem(`c-${d}-${h}`) === "true") done++;
+    }
+    ctx.fillStyle="#ec4899";
+    ctx.fillRect(10,80-done*3,30,done*3);
+  });
+}
+
+document.getElementById("clearAll").onclick = () => {
+  if (!confirm("Clear all tasks?")) return;
+  localStorage.clear();
+  location.reload();
+};
+
+update();
+</script>
+
+</body>
+</html>
